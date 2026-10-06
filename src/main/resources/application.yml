@@ -27,3 +27,8 @@ management:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:Zmxvd2ZvcmdlLWRldmVsb3BtZW50LXNlY3JldC1rZXktY2hhbmdlLW1l}
+    expiration: ${JWT_EXPIRATION:24h}
