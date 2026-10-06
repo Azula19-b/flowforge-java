@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:flowforge;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  main:
+    banner-mode: off
+
+app:
+  jwt:
+    secret: Zmxvd2ZvcmdlLXRlc3Qtc2VjcmV0LWtleS10aGF0LWlzLWxvbmc=
+    expiration: 1h
+
+logging:
+  level:
+    root: WARN
