@@ -1,0 +1,36 @@
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-flowforge}
+      POSTGRES_USER: ${DB_USERNAME:-flowforge}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-flowforge}
+    volumes:
+      - flowforge-data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-flowforge} -d ${DB_NAME:-flowforge}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-flowforge}
+      DB_USERNAME: ${DB_USERNAME:-flowforge}
+      DB_PASSWORD: ${DB_PASSWORD:-flowforge}
+      JWT_SECRET: ${JWT_SECRET:-Zmxvd2ZvcmdlLWRvY2tlci1sb2NhbC1zZWNyZXQta2V5LTIwMjY=}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+volumes:
+  flowforge-data:
