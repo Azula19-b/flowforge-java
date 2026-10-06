@@ -7,6 +7,7 @@ import com.flowforge.entity.Project;
 import com.flowforge.entity.Task;
 import com.flowforge.entity.User;
 import com.flowforge.enums.ProjectStatus;
+import com.flowforge.enums.ActivityAction;
 import com.flowforge.enums.Role;
 import com.flowforge.enums.TaskPriority;
 import com.flowforge.enums.TaskStatus;
@@ -16,6 +17,8 @@ import com.flowforge.exception.ValidationException;
 import com.flowforge.repository.TaskRepository;
 import com.flowforge.repository.TaskSpecifications;
 import com.flowforge.repository.UserRepository;
+import com.flowforge.repository.CommentRepository;
+import com.flowforge.repository.ActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,6 +41,9 @@ public class TaskService {
     private final AuthenticatedUserService authenticatedUserService;
     private final ProjectAccessService projectAccessService;
     private final TaskWorkflowService workflowService;
+    private final CommentRepository commentRepository;
+    private final ActivityLogRepository activityLogRepository;
+    private final ActivityLogService activityLogService;
     private final Clock clock;
 
     @Transactional
@@ -57,7 +63,10 @@ public class TaskService {
         if (request.assigneeId() != null) {
             task.setAssignee(requireProjectMember(project, request.assigneeId()));
         }
-        return response(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+        activityLogService.record(ActivityAction.TASK_CREATED, actor, project, saved,
+                "Created task '" + saved.getTitle() + "'");
+        return response(saved);
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +88,10 @@ public class TaskService {
         if (request.description() != null) {
             task.setDescription(trimToNull(request.description()));
         }
-        return response(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+        activityLogService.record(ActivityAction.TASK_UPDATED, actor, task.getProject(), saved,
+                "Updated task '" + saved.getTitle() + "'");
+        return response(saved);
     }
 
     @Transactional
@@ -87,6 +99,10 @@ public class TaskService {
         User actor = authenticatedUserService.getCurrentUser();
         Task task = findTask(taskId);
         projectAccessService.requireManageable(task.getProject().getId(), actor);
+        activityLogRepository.detachTask(taskId);
+        commentRepository.deleteAllByTaskId(taskId);
+        activityLogService.record(ActivityAction.TASK_DELETED, actor, task.getProject(), null,
+                "Deleted task '" + task.getTitle() + "'");
         taskRepository.delete(task);
     }
 
@@ -96,7 +112,10 @@ public class TaskService {
         Task task = findTask(taskId);
         projectAccessService.requireManageable(task.getProject().getId(), actor);
         task.setAssignee(requireProjectMember(task.getProject(), assigneeId));
-        return response(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+        activityLogService.record(ActivityAction.TASK_ASSIGNED, actor, task.getProject(), saved,
+                "Assigned task '" + task.getTitle() + "' to " + saved.getAssignee().getEmail());
+        return response(saved);
     }
 
     @Transactional
@@ -107,7 +126,12 @@ public class TaskService {
         workflowService.validate(task.getStatus(), status);
         task.setStatus(status);
         task.setCompletedAt(status == TaskStatus.DONE ? clock.instant() : null);
-        return response(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+        ActivityAction action = status == TaskStatus.DONE
+                ? ActivityAction.TASK_COMPLETED : ActivityAction.TASK_STATUS_CHANGED;
+        activityLogService.record(action, actor, task.getProject(), saved,
+                "Changed task '" + task.getTitle() + "' status to " + status);
+        return response(saved);
     }
 
     @Transactional
@@ -116,7 +140,11 @@ public class TaskService {
         Task task = findTask(taskId);
         requireTaskManagerOrCreator(task, actor);
         task.setPriority(priority);
-        return response(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+        activityLogService.record(ActivityAction.TASK_PRIORITY_CHANGED, actor,
+                task.getProject(), saved,
+                "Changed task '" + task.getTitle() + "' priority to " + priority);
+        return response(saved);
     }
 
     @Transactional
@@ -126,7 +154,10 @@ public class TaskService {
         requireTaskManagerOrCreator(task, actor);
         validateDueDate(dueDate);
         task.setDueDate(dueDate);
-        return response(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+        activityLogService.record(ActivityAction.TASK_DUE_DATE_CHANGED, actor,
+                task.getProject(), saved, "Changed the due date for task '" + task.getTitle() + "'");
+        return response(saved);
     }
 
     @Transactional(readOnly = true)

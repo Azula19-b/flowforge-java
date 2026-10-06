@@ -8,6 +8,7 @@ import com.flowforge.dto.user.UserResponse;
 import com.flowforge.entity.Project;
 import com.flowforge.entity.User;
 import com.flowforge.enums.ProjectStatus;
+import com.flowforge.enums.ActivityAction;
 import com.flowforge.enums.Role;
 import com.flowforge.enums.TaskStatus;
 import com.flowforge.exception.DuplicateResourceException;
@@ -31,6 +32,7 @@ public class ProjectService {
     private final TaskRepository taskRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final ProjectAccessService projectAccessService;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public ProjectResponse create(CreateProjectRequest request) {
@@ -43,7 +45,10 @@ public class ProjectService {
         project.setOwner(user);
         project.getMembers().add(user);
         project.setStatus(request.status() == null ? ProjectStatus.PLANNING : request.status());
-        return response(projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+        activityLogService.record(ActivityAction.PROJECT_CREATED, user, saved, null,
+                "Created project '" + saved.getName() + "'");
+        return response(saved);
     }
 
     @Transactional(readOnly = true)
@@ -75,7 +80,10 @@ public class ProjectService {
         if (request.status() != null) {
             project.setStatus(request.status());
         }
-        return response(projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+        activityLogService.record(ActivityAction.PROJECT_UPDATED, user, saved, null,
+                "Updated project '" + saved.getName() + "'");
+        return response(saved);
     }
 
     @Transactional
@@ -83,7 +91,10 @@ public class ProjectService {
         User user = authenticatedUserService.getCurrentUser();
         Project project = projectAccessService.requireManageable(projectId, user);
         project.setStatus(ProjectStatus.ARCHIVED);
-        return response(projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+        activityLogService.record(ActivityAction.PROJECT_ARCHIVED, user, saved, null,
+                "Archived project '" + saved.getName() + "'");
+        return response(saved);
     }
 
     @Transactional
@@ -96,6 +107,8 @@ public class ProjectService {
         }
         project.getMembers().add(member);
         projectRepository.save(project);
+        activityLogService.record(ActivityAction.MEMBER_ADDED, actor, project, null,
+                "Added " + member.getEmail() + " to the project");
         return memberResponses(project);
     }
 
@@ -111,6 +124,8 @@ public class ProjectService {
             throw new ResourceNotFoundException("User is not a member of this project");
         }
         projectRepository.save(project);
+        activityLogService.record(ActivityAction.MEMBER_REMOVED, actor, project, null,
+                "Removed user " + userId + " from the project");
     }
 
     @Transactional(readOnly = true)

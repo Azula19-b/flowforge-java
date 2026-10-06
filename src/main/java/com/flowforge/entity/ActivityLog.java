@@ -54,6 +54,8 @@ public class ActivityLog {
 
     @PrePersist
     protected void onCreate() {
-        timestamp = Instant.now();
+        if (timestamp == null) {
+            timestamp = Instant.now();
+        }
     }
 }

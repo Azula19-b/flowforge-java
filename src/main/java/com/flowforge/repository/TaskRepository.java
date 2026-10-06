@@ -21,6 +21,7 @@ public interface TaskRepository extends JpaRepository<Task, Long>, JpaSpecificat
     long countByAssigneeIdAndStatus(Long assigneeId, TaskStatus status);
     long countByAssigneeIdAndPriorityIn(Long assigneeId, Collection<TaskPriority> priorities);
     long countByProjectIdAndDueDateBeforeAndStatusNot(Long projectId, Instant now, TaskStatus status);
+    List<Task> findByProjectId(Long projectId);
     List<Task> findByAssigneeId(Long assigneeId);
 
     @Query("select t from Task t where t.assignee.id = :userId " +
